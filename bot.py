@@ -27,30 +27,36 @@ async def on_ready():
     except Exception as e:
         print(f"Failed to sync commands: {e}")
 
-@bot.tree.command(name="runremote", description="Send a message to another server channel")
-@app_commands.describe(server_name="Target server short name", message="Message to send")
-async def runremote(interaction: discord.Interaction, server_name: str, message: str):
-    await interaction.response.defer(thinking=True)
-
-    if server_name not in REMOTE_SERVERS:
-        await interaction.followup.send(f"❌ Server `{server_name}` not found.")
-        return
-
-    guild_id, channel_id = REMOTE_SERVERS[server_name]
-    guild = bot.get_guild(guild_id)
-    if guild is None:
-        await interaction.followup.send(f"❌ Bot is not in the guild/server `{server_name}`.")
-        return
-
-    channel = guild.get_channel(channel_id)
-    if channel is None:
-        await interaction.followup.send(f"❌ Channel not found in server `{server_name}`.")
-        return
-
+@bot.command()
+async def runremote(ctx, *, arg):
     try:
-        await channel.send(f"[Remote message from {interaction.user}]: {message}")
-        await interaction.followup.send(f"✅ Message sent to `{server_name}`.")
+        args = dict(item.split(":") for item in arg.split(" ") if ":" in item)
+        server_name = args.get("server_name")
+        message = args.get("message")
+
+        if not server_name or not message:
+            await ctx.send("Usage: /runremote server_name: <name> message: <text>")
+            return
+
+        if server_name not in REMOTE_SERVERS:
+            await ctx.send(f"Unknown server: {server_name}")
+            return
+
+        guild_id, channel_id = REMOTE_SERVERS[server_name]
+        guild = bot.get_guild(int(guild_id))
+        if not guild:
+            await ctx.send("Guild not found or bot is not in that server.")
+            return
+
+        channel = guild.get_channel(int(channel_id))
+        if not channel:
+            await ctx.send("Channel not found.")
+            return
+
+        # এখানে শুধু message পাঠাচ্ছি, author tag ছাড়াই
+        await channel.send(message)
+        await ctx.send("Message sent successfully.")
     except Exception as e:
-        await interaction.followup.send(f"⚠️ Failed to send message: {e}")
+        await ctx.send(f"Error: {str(e)}")
 
 bot.run(TOKEN)
