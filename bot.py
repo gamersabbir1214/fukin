@@ -53,4 +53,118 @@ async def runremote(interaction: discord.Interaction, server_name: str, message:
     except Exception as e:
         await interaction.followup.send(f"⚠️ Failed to send message: {e}")
 
+
+
+# -------- /setup --------
+@client.tree.command(name="setup", description="Register this channel for bot commands")
+@app_commands.checks.has_permissions(administrator=True)
+async def setup(interaction: discord.Interaction):
+    channel = interaction.channel
+    registered_channels[interaction.guild.id] = channel.id
+    await interaction.response.send_message(
+        f"✅ This channel {channel.mention} is now registered for bot commands.",
+        ephemeral=True
+    )
+
+# -------- Error handler --------
+@setup.error
+async def setup_error_handler(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.MissingPermissions):
+        await interaction.response.send_message(
+            "❌ You need to be an **administrator** to use this command.",
+            ephemeral=True
+        )
+    else:
+        await interaction.response.send_message(
+            f"❌ An error occurred:\n```{str(error)}```",
+            ephemeral=True
+        )
+
+# -------- Helper: Channel is registered or not --------
+async def is_registered(interaction: discord.Interaction):
+    return registered_channels.get(interaction.guild.id) == interaction.channel.id
+
+    # like
+@client.tree.command(name="like", description="Send like to Free Fire UID")
+@app_commands.describe(uid="Enter Free Fire UID", region="Enter Server Region (e.g. BD)")
+async def like(interaction: discord.Interaction, uid: str, region: str):
+    import aiohttp
+
+    # চ্যানেল রেজিস্টার চেক
+    if not await is_registered(interaction):
+        guild_id = interaction.guild.id
+        reg_channel_id = registered_channels.get(guild_id)
+        if reg_channel_id:
+            reg_channel_mention = f"<#{reg_channel_id}>"
+            await interaction.response.send_message(
+                f"❌ এই চ্যানেল রেজিস্টার করা হয়নি। অনুগ্রহ করে {reg_channel_mention} তে কমান্ডটি ব্যবহার করুন।",
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                "❌ এই সার্ভারে কোনো চ্যানেল রেজিস্টার করা হয়নি। প্রথমে কোনো একটি চ্যানেলে `/setup` কমান্ড দিন।",
+                ephemeral=True
+            )
+        return
+
+    if not uid.isdigit():
+        await interaction.response.send_message("❌ Invalid UID! Example: `/like 123456789`", ephemeral=True)
+        return
+
+    await interaction.response.defer()
+
+    url = f"https://like-api2.vercel.app/like?uid={uid}&server_name={region}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=10) as resp:
+                if resp.status != 200:
+                    await interaction.followup.send(f"❌ API returned bad status: {resp.status}")
+                    return
+
+                data = await resp.json()
+
+                status = data.get("status")
+                nickname = data.get("PlayerNickname")
+                uid = data.get("UID")
+                likes_before = data.get("LikesbeforeCommand")
+                likes_added = data.get("LikesGivenByAPI")
+                likes_after = data.get("LikesafterCommand")
+
+                if status == 1:
+                    info = (
+                        f"```┌ FREE FIRE LIKE ADDED\n"
+                        f"├─ Nickname: {nickname}\n"
+                        f"├─ Likes Before: {likes_before}\n"
+                        f"├─ Likes Added: {likes_added}\n"
+                        f"└─ Likes After: {likes_after}\n"
+                        f"UID: {uid}```"
+                    )
+                    embed = discord.Embed(
+                        title="🔥 Free Fire Like Added!",
+                        description=info,
+                        color=discord.Color.purple()
+                    )
+                    embed.set_thumbnail(url=interaction.user.display_avatar.url)
+                    embed.set_image(url="https://i.imgur.com/ajygBes.gif")
+                    embed.set_footer(text="📌 Dev </> GAMER SABBIR")
+                    await interaction.followup.send(embed=embed)
+                    return
+
+                elif status == 2:
+                    await interaction.followup.send(
+                        f"⚠️ No new likes were added.\n```Nickname: {nickname}\nUID: {uid}\nLikes: {likes_after}```"
+                    )
+                    return
+
+                else:
+                    await interaction.followup.send("⚠️ Unexpected response. Please try again later.")
+
+    except Exception as e:
+        short_error = str(e)
+        if len(short_error) > 1900:
+            short_error = short_error[:1900] + "..."
+        await interaction.followup.send(f"❌ Error:\n```{short_error}```", ephemeral=True)
+
+
 bot.run(TOKEN)
