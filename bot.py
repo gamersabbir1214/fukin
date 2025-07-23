@@ -54,58 +54,13 @@ async def runremote(interaction: discord.Interaction, server_name: str, message:
         await interaction.followup.send(f"⚠️ Failed to send message: {e}")
 
 
-
-# -------- /setup --------
-@client.tree.command(name="setup", description="Register this channel for bot commands")
-@app_commands.checks.has_permissions(administrator=True)
-async def setup(interaction: discord.Interaction):
-    channel = interaction.channel
-    registered_channels[interaction.guild.id] = channel.id
-    await interaction.response.send_message(
-        f"✅ This channel {channel.mention} is now registered for bot commands.",
-        ephemeral=True
-    )
-
-# -------- Error handler --------
-@setup.error
-async def setup_error_handler(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    if isinstance(error, app_commands.MissingPermissions):
-        await interaction.response.send_message(
-            "❌ You need to be an **administrator** to use this command.",
-            ephemeral=True
-        )
-    else:
-        await interaction.response.send_message(
-            f"❌ An error occurred:\n```{str(error)}```",
-            ephemeral=True
-        )
-
-# -------- Helper: Channel is registered or not --------
-async def is_registered(interaction: discord.Interaction):
-    return registered_channels.get(interaction.guild.id) == interaction.channel.id
-
-    # like
 @client.tree.command(name="like", description="Send like to Free Fire UID")
 @app_commands.describe(uid="Enter Free Fire UID", region="Enter Server Region (e.g. BD)")
 async def like(interaction: discord.Interaction, uid: str, region: str):
     import aiohttp
 
     # চ্যানেল রেজিস্টার চেক
-    if not await is_registered(interaction):
-        guild_id = interaction.guild.id
-        reg_channel_id = registered_channels.get(guild_id)
-        if reg_channel_id:
-            reg_channel_mention = f"<#{reg_channel_id}>"
-            await interaction.response.send_message(
-                f"❌ এই চ্যানেল রেজিস্টার করা হয়নি। অনুগ্রহ করে {reg_channel_mention} তে কমান্ডটি ব্যবহার করুন।",
-                ephemeral=True
-            )
-        else:
-            await interaction.response.send_message(
-                "❌ এই সার্ভারে কোনো চ্যানেল রেজিস্টার করা হয়নি। প্রথমে কোনো একটি চ্যানেলে `/setup` কমান্ড দিন।",
-                ephemeral=True
-            )
-        return
+    
 
     if not uid.isdigit():
         await interaction.response.send_message("❌ Invalid UID! Example: `/like 123456789`", ephemeral=True)
